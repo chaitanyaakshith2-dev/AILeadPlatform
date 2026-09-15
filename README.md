@@ -1,3 +1,5 @@
+HEAD
+
 # LeadFlow AI
 
 LeadFlow AI is an AI-powered lead management SaaS for small businesses. It will eventually capture customer inquiries, analyze them, score and extract lead information, store leads, and help businesses follow up.
@@ -63,7 +65,7 @@ curl http://localhost:8000/health
 Expected response:
 
 ```json
-{"status":"ok"}
+{ "status": "ok" }
 ```
 
 Interactive API documentation is available at http://localhost:8000/docs.
@@ -114,3 +116,7 @@ The public capture endpoint is available at the webhook URL shown in the dashboa
 ## Current project status
 
 Authentication, tenant ownership, and opt-in AI lead analysis are implemented. Users can sign up, log in, log out, manage their own leads, and request structured scoring and analysis through the protected dashboard and authenticated API. Payments, email automation, n8n workflows, and production deployment are intentionally not implemented yet.
+
+# AILeadPlatform
+
+a0505c3ae04481f814eda439d8e85f05e644e028
