@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+supabase>=2.0.0
+pytest
+httpx>=0.28.0
+openai>=1.0.0
