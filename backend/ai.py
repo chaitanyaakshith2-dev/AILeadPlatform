@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Any
 
 import httpx
@@ -42,13 +43,13 @@ class AIReplyError(RuntimeError):
 SYSTEM_PROMPT = """You analyze incoming business leads for a small-business CRM.
 Return only valid JSON with exactly these fields:
 {
-  \"lead_score\": integer from 0 to 100,
-  \"business_type\": string,
-  \"budget\": string or null,
-  \"timeline\": string or null,
-  \"requirements\": array of strings,
-  \"priority\": \"HIGH\", \"MEDIUM\", or \"LOW\",
-  \"reasoning\": string
+  "lead_score": integer from 0 to 100,
+  "business_type": string,
+  "budget": string or null,
+  "timeline": string or null,
+  "requirements": array of strings,
+  "priority": "HIGH", "MEDIUM", or "LOW",
+  "reasoning": string
 }
 Infer cautiously. Use null when budget or timeline is not stated. Do not invent contact details.
 """
@@ -56,15 +57,19 @@ Infer cautiously. Use null when budget or timeline is not stated. Do not invent 
 
 def _parse_analysis(raw_content: str) -> LeadAnalysis:
     try:
-        payload: Any = json.loads(raw_content)
+        # Strip markdown code blocks if the model wrapped the JSON
+        cleaned = raw_content.strip()
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+        payload: Any = json.loads(cleaned)
         return LeadAnalysis.model_validate(payload)
     except (json.JSONDecodeError, TypeError, ValueError) as error:
-        raise AIAnalysisError("The AI provider returned invalid lead analysis") from error
+        raise AIAnalysisError(f"The AI provider returned invalid lead analysis: {raw_content}") from error
 
 
 def _analyze_with_openai(message: str, api_key: str) -> LeadAnalysis:
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key.strip())
     response = client.chat.completions.create(
         model=model,
         temperature=0,
@@ -82,24 +87,38 @@ def _analyze_with_openai(message: str, api_key: str) -> LeadAnalysis:
 
 def _analyze_with_gemini(message: str, api_key: str) -> LeadAnalysis:
     model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent"
     payload = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": message}]}],
         "generationConfig": {"temperature": 0, "responseMimeType": "application/json"},
     }
+
     try:
-        response = httpx.post(url, params={"key": api_key}, json=payload, timeout=30)
-        response.raise_for_status()
-        data = response.json()
+        response = httpx.post(
+            url,
+            params={"key": api_key.strip()},
+            json=payload,
+            timeout=30,
+        )
+    except httpx.HTTPError as err:
+        raise AIAnalysisError(f"Could not connect to Gemini API: {err}") from err
+
+    if response.status_code != 200:
+        print(f"GEMINI ERROR {response.status_code}: {response.text}")
+        raise AIAnalysisError(f"Gemini API returned error {response.status_code}: {response.text}")
+
+    data = response.json()
+    try:
         content = data["candidates"][0]["content"]["parts"][0]["text"]
-    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as error:
-        raise AIAnalysisError("The Gemini response did not contain valid analysis") from error
+    except (KeyError, IndexError, TypeError) as err:
+        raise AIAnalysisError(f"Gemini returned unexpected JSON structure: {data}") from err
+
     return _parse_analysis(content)
 
 
 def analyze_lead_with_ai(message: str) -> LeadAnalysis:
-    provider = os.getenv("AI_PROVIDER", "openai").lower()
+    provider = os.getenv("AI_PROVIDER", "openai").lower().strip()
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -144,7 +163,7 @@ def _clean_reply(content: str | None) -> str:
 
 def _reply_with_openai(lead_message: str, analysis: dict, api_key: str) -> str:
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key.strip())
     try:
         response = client.chat.completions.create(
             model=model,
@@ -163,14 +182,14 @@ def _reply_with_openai(lead_message: str, analysis: dict, api_key: str) -> str:
 
 def _reply_with_gemini(lead_message: str, analysis: dict, api_key: str) -> str:
     model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent"
     payload = {
         "systemInstruction": {"parts": [{"text": REPLY_SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": _reply_prompt(lead_message, analysis)}]}],
         "generationConfig": {"temperature": 0.4},
     }
     try:
-        response = httpx.post(url, params={"key": api_key}, json=payload, timeout=30)
+        response = httpx.post(url, params={"key": api_key.strip()}, json=payload, timeout=30)
         response.raise_for_status()
         data = response.json()
         content = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -187,7 +206,7 @@ def generate_followup_reply(
     business_settings: dict | None = None,
 ) -> str:
     """Generate a send-ready follow-up using the configured AI provider."""
-    provider = os.getenv("AI_PROVIDER", "openai").lower()
+    provider = os.getenv("AI_PROVIDER", "openai").lower().strip()
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
