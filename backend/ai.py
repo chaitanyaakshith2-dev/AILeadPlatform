@@ -86,8 +86,10 @@ def _analyze_with_openai(message: str, api_key: str) -> LeadAnalysis:
 
 
 def _analyze_with_gemini(message: str, api_key: str) -> LeadAnalysis:
-    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent"
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    # Ensure the URL is fully qualified with https://
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    
     payload = {
         "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": message}]}],
@@ -181,8 +183,8 @@ def _reply_with_openai(lead_message: str, analysis: dict, api_key: str) -> str:
 
 
 def _reply_with_gemini(lead_message: str, analysis: dict, api_key: str) -> str:
-    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent"
+    model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash").strip()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     payload = {
         "systemInstruction": {"parts": [{"text": REPLY_SYSTEM_PROMPT}]},
         "contents": [{"parts": [{"text": _reply_prompt(lead_message, analysis)}]}],
