@@ -1,0 +1,13 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowUpRight, Building2, Mail, MessageSquare, Sparkles } from "lucide-react";
+import AiPulseButton from "@/components/ui/AiPulseButton";
+import GlassCard from "@/components/ui/GlassCard";
+
+export type Lead = { id: string; name: string; email: string | null; company: string | null; message: string; status: string; created_at: string; analysis: { lead_score: number; business_type: string; budget: string | null; timeline: string | null; requirements: string[]; priority: "HIGH" | "MEDIUM" | "LOW"; reasoning: string } | null };
+type LeadTable3DProps = { leads: Lead[]; analyzingLeadId: string | null; replyLeadId: string | null; onAnalyze: (leadId: string) => void; onGenerateReply: (leadId: string) => void };
+
+export default function LeadTable3D({ leads, analyzingLeadId, replyLeadId, onAnalyze, onGenerateReply }: LeadTable3DProps) {
+  return <div className="lead-list"><div className="lead-list-head"><span>Prospect</span><span>Signal</span><span>Next move</span></div><AnimatePresence initial={false}>{leads.map((lead, index) => { const score = lead.analysis?.lead_score ?? 0; const priority = lead.analysis?.priority.toLowerCase() ?? "new"; return <motion.div key={lead.id} className="lead-row" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.06 }}><div className="lead-prospect"><div className="lead-avatar">{lead.name.slice(0, 1).toUpperCase()}</div><div><strong>{lead.name}</strong><span><Building2 size={12} />{lead.company || "Independent"}</span><span><Mail size={12} />{lead.email || "No email"}</span></div></div><div className="lead-signal"><div className="score-line"><span className={`status-chip status-${priority}`}>{lead.analysis ? lead.analysis.priority : "UNREAD"}</span><strong>{lead.analysis ? `${score}%` : "--"}</strong></div><div className="confidence-track"><motion.span initial={{ width: 0 }} animate={{ width: `${score}%` }} /></div><small>{lead.analysis?.business_type || "Awaiting AI analysis"}</small></div><div className="lead-action"><p><MessageSquare size={13} />{lead.message}</p>{lead.analysis ? <button className="table-action" type="button" onClick={() => onGenerateReply(lead.id)} disabled={replyLeadId === lead.id}>{replyLeadId === lead.id ? "Drafting..." : "Draft reply"}<ArrowUpRight size={14} /></button> : <AiPulseButton loading={analyzingLeadId === lead.id} onClick={() => onAnalyze(lead.id)}>Analyze lead</AiPulseButton>}</div></motion.div>; })}</AnimatePresence>{leads.length === 0 && <GlassCard className="empty-leads" interactive={false}><Sparkles size={22} /><strong>Your pipeline is quiet.</strong><span>Add your first lead to activate the AI signal engine.</span></GlassCard>}</div>;
+}

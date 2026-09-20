@@ -1,29 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Activity, ArrowUpRight, Check, Copy, LogOut, Plus, Search, Settings2, Users, X, Zap } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
+import AiPulseButton from "@/components/ui/AiPulseButton";
+import GlassCard from "@/components/ui/GlassCard";
+import LeadTable3D, { type Lead } from "@/components/dashboard/LeadTable3D";
 
-type Lead = {
-  id: string;
-  name: string;
-  email: string | null;
-  company: string | null;
-  message: string;
-  status: string;
-  created_at: string;
-  analysis: {
-    lead_score: number;
-    business_type: string;
-    budget: string | null;
-    timeline: string | null;
-    requirements: string[];
-    priority: "HIGH" | "MEDIUM" | "LOW";
-    reasoning: string;
-  } | null;
-};
+const HeroScene = dynamic(() => import("@/components/canvas/HeroScene"), { ssr: false });
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -144,24 +132,15 @@ export default function DashboardClient({ email }: { email: string }) {
 
   return (
     <main className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">LeadFlow AI</p>
-          <h1>Leads</h1>
-          <p className="muted">{email}</p>
-          <nav className="dashboard-nav"><span aria-current="page">Leads</span><Link href="/dashboard/settings">Settings</Link></nav>
-        </div>
-        <button type="button" className="secondary-button" onClick={handleLogout}>Log out</button>
-      </header>
+      <header className="topbar"><Link className="brand" href="/dashboard"><span className="brand-mark"><Zap size={15} fill="currentColor" /></span>leadflow<span className="brand-ai">ai</span></Link><div className="topbar-actions"><span className="user-email">{email}</span><Link className="icon-button" href="/dashboard/settings" aria-label="Settings"><Settings2 size={17} /></Link><button type="button" className="icon-button" onClick={handleLogout} aria-label="Log out"><LogOut size={17} /></button></div></header>
+      <section className="dashboard-hero"><div className="hero-copy"><p className="eyebrow"><span className="live-dot" /> AI-POWERED PIPELINE</p><h1>Turn interest into <em>momentum.</em></h1><p className="hero-description">Your intelligent command center for capturing, understanding, and converting every lead.</p><div className="hero-actions"><AiPulseButton onClick={() => setShowForm(true)}><Plus size={15} /> Add new lead</AiPulseButton><span className="shortcut"><span>⌘</span> K <span className="shortcut-label">Quick actions</span></span></div></div><div className="hero-visual"><HeroScene /><div className="hero-visual-label"><Activity size={14} /><span>Neural signal active</span><strong>98.4%</strong></div></div></section>
 
       <section className="dashboard-content">
-        <div className="section-heading">
-          <h2>Your leads</h2>
-          <button type="button" onClick={() => setShowForm(!showForm)}>{showForm ? "Cancel" : "Add lead"}</button>
-        </div>
+        <div className="metrics-grid"><GlassCard className="metric-card" interactive={false}><span className="metric-icon cyan"><Users size={17} /></span><span className="metric-label">Total prospects</span><strong>{leads.length}</strong><small><span className="trend-up">+12.8%</span> this month</small></GlassCard><GlassCard className="metric-card" interactive={false}><span className="metric-icon violet"><Zap size={17} /></span><span className="metric-label">Avg. lead score</span><strong>{leads.length ? Math.round(leads.reduce((total, lead) => total + (lead.analysis?.lead_score ?? 0), 0) / leads.length) : 0}</strong><small><span className="trend-up">+8.2%</span> vs last month</small></GlassCard><GlassCard className="metric-card" interactive={false}><span className="metric-icon amber"><Activity size={17} /></span><span className="metric-label">Response rate</span><strong>84.6%</strong><small><span className="trend-up">+4.1%</span> this month</small></GlassCard><GlassCard className="metric-card signal-card" interactive={false}><div className="signal-wave"><span /><span /><span /><span /><span /></div><span className="metric-label">AI engine status</span><strong>Learning from your flow</strong><small><span className="live-dot" /> Processing signals in real time</small></GlassCard></div>
+        <div className="section-heading"><div><p className="eyebrow">YOUR WORKSPACE</p><h2>Lead intelligence</h2></div><div className="section-tools"><div className="search-field"><Search size={15} /><input placeholder="Search leads..." aria-label="Search leads" /></div><button type="button" className="add-button" onClick={() => setShowForm(!showForm)}>{showForm ? <X size={16} /> : <Plus size={16} />}{showForm ? "Cancel" : "Add lead"}</button></div></div>
 
         {showForm && (
-          <form onSubmit={handleSubmit} className="lead-form">
+          <form onSubmit={handleSubmit} className="lead-form glass-card">
             <label>Name<input value={name} onChange={(event) => setName(event.target.value)} required /></label>
             <label>Email<input type="email" value={leadEmail} onChange={(event) => setLeadEmail(event.target.value)} /></label>
             <label>Company<input value={company} onChange={(event) => setCompany(event.target.value)} /></label>
@@ -178,39 +157,15 @@ export default function DashboardClient({ email }: { email: string }) {
                 <p className="eyebrow">AI follow-up</p>
                 <h3>Suggested reply</h3>
               </div>
-              <button type="button" className="secondary-button" onClick={() => { setSuggestedReply(null); setReplyLeadId(null); }}>Close</button>
+              <button type="button" className="icon-button" onClick={() => { setSuggestedReply(null); setReplyLeadId(null); }} aria-label="Close reply"><X size={16} /></button>
             </div>
             <textarea className="reply-text" value={suggestedReply} readOnly rows={7} aria-label="Suggested follow-up reply" />
-            <button type="button" onClick={() => void copyReply()}>{copiedReply ? "Copied" : "Copy reply"}</button>
+            <button type="button" className="add-button" onClick={() => void copyReply()}>{copiedReply ? <Check size={15} /> : <Copy size={15} />}{copiedReply ? "Copied" : "Copy reply"}</button>
           </aside>
         )}
-        {loading ? <p className="muted">Loading leads...</p> : leads.length === 0 ? <p className="muted">No leads yet.</p> : (
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>AI analysis</th><th>Message</th><th>Action</th></tr></thead>
-              <tbody>{leads.map((lead) => <tr key={lead.id}>
-                <td>{lead.name}</td>
-                <td>{lead.company || "-"}</td>
-                <td>{lead.email || "-"}</td>
-                <td>
-                  {lead.analysis ? <div className="analysis-summary">
-                    <strong>{lead.analysis.lead_score}/100</strong>
-                    <span className={`priority priority-${lead.analysis.priority.toLowerCase()}`}>{lead.analysis.priority}</span>
-                    <span>{lead.analysis.business_type}</span>
-                    <span>Budget: {lead.analysis.budget || "Unknown"}</span>
-                    <span>Timeline: {lead.analysis.timeline || "Unknown"}</span>
-                  </div> : <span className="muted">Not analyzed</span>}
-                </td>
-                <td>{lead.message}</td>
-                <td>
-                  {lead.analysis && <button type="button" onClick={() => void handleGenerateReply(lead.id)} disabled={replyLeadId === lead.id}>{replyLeadId === lead.id ? "Generating..." : "Generate AI Reply"}</button>}
-                  {!lead.analysis && <button type="button" onClick={() => void handleAnalyze(lead.id)} disabled={analyzingLeadId === lead.id}>{analyzingLeadId === lead.id ? "Analyzing..." : "Analyze with AI"}</button>}
-                </td>
-              </tr>)}</tbody>
-            </table>
-          </div>
-        )}
+        {loading ? <p className="loading-state"><span className="loading-spinner" />Calibrating your pipeline...</p> : <LeadTable3D leads={leads} analyzingLeadId={analyzingLeadId} replyLeadId={replyLeadId} onAnalyze={(leadId) => void handleAnalyze(leadId)} onGenerateReply={(leadId) => void handleGenerateReply(leadId)} />}
       </section>
+      <footer className="dashboard-footer"><span>Leadflow AI <span className="muted">/ Workspace</span></span><span>Built for focus <ArrowUpRight size={13} /></span></footer>
     </main>
   );
 }
